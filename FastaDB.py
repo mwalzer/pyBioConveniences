@@ -27,7 +27,7 @@ class FastaDB:
             db.read_seqs(d)
         """
         self.name = name
-        self.collection = {}
+        self.collection = {}  # all the biopython seq records in a dict keyed by the id of the record
         self.searchstring = ''  # all sequences concatenated with a '#'
         self.accs = list()  # all accessions in respective order to searchstring
         self.idx = list()  # all indices of starting strings in the searchstring in respective order
@@ -46,9 +46,9 @@ class FastaDB:
                     if sequence_file.endswith('.fa') or sequence_file.endswith('.fasta'):
                         recs = SeqIO.to_dict(SeqIO.parse(f, "fasta"))
                     else:  # assume it is a dat file
-                        recs = SeqIO.to_dict(SeqIO.parse(open('/tmp/uniprot_sprot_human.dat'), 'swiss'))
+                        recs = SeqIO.to_dict(SeqIO.parse(open(sequence_file), 'swiss'))
             except:
-                warnings.warn("Could not read file")
+                warnings.warn("Could not read file", UserWarning)
                 return
         if isinstance(sequence_file, list):
             recs = SeqIO.to_dict(sequence_file)
@@ -68,7 +68,7 @@ class FastaDB:
         :param name: the complete path with file name where the fasta is going to be written
         """
         with open(name, "w") as output:
-            SeqIO.write(self.collection, output, "fasta")
+            SeqIO.write(self.collection.values(), output, "fasta")
 
     def exists(self, seq):
         """
