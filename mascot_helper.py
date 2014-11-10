@@ -94,7 +94,7 @@ def get_sites():
   return slots,prebuilds
   
 def invalid_seq(seq):
-  allowed = ['A','R','N','D','C','E','Q','G','H','I','L','K','M','F','P','S','T','W','Y','V','U','X']
+  allowed = ['A','R','N','D','C','E','Q','G','H','I','L','K','M','F','P','S','T','W','Y','V','U','X','Z','B']
   if isinstance(seq, str) or isinstance(seq, SeqRecord):
     for s in seq:
       if s not in allowed:
@@ -105,12 +105,18 @@ def invalid_seq(seq):
         if s not in allowed:
           #~ print s, 'is not allowed in', str(r.id)
           return s + ' is not allowed in ' + str(r.id)
+  elif isinstance(seq, dict):
+    for r in seq:
+      for s in str(seq[r]):
+        if s not in allowed:
+          #~ print s, 'is not allowed in', str(r.id)
+          return s + ' is not allowed in ' + str(r)
   else:
     return True
   #~ TODO r.id check mascot compliance  
   return False
 
-def ambigous_seq(seq):
+def ambigous_aminoacid(seq):
   ret = ''
   if isinstance(seq, str) or isinstance(seq, SeqRecord):
     if 'X' in seq:
@@ -119,9 +125,33 @@ def ambigous_seq(seq):
     for r in seq:
       if 'X' in r:
         ret = ret + 'Added ' + str(r.id) + ' contains aminoacid code X!\n'
+  elif isinstance(seq, dict):
+    for r in seq:
+      if 'X' in seq[r]:
+        ret = ret + 'Added ' + str(r) + ' contains aminoacid code X!\n'
   else:
     ret = 'Something unreadable added!'
   return ret
+  
+def acc_not_seen_before(what,seen):
+  if what.id.split('|',1)[-1] not in seen:
+    seen.add(what.id.split('|',1)[-1])
+    return True
+  return False  
+
+def seq_not_seen_before(what,seen):
+  if str(what.seq) not in seen:
+    seen.add(str(what.seq))
+    return True
+  return False
+
+def remove_dupl(seq):  
+  if isinstance(seq, list):
+    uni = set()
+    seq = [x for x in seq if acc_not_seen_before(x,uni)]    
+    uni = set()
+    seq = [x for x in seq if seq_not_seen_before(x,uni)]    
+  return seq
 
 @get('/Mupdate')
 def m_update():
@@ -164,6 +194,7 @@ def do_m_update():
   basis = request.forms.get('basisselection')
   myfasta = list()
   baseids = list()
+  records = dict()
   ### base fasta given, needs to be in swissprot header format: xx|accession|name description
   if basis!="0":  
     with open('/home/user/mascot/basisfasta/'+prebuilds[int(basis)], 'rb') as file:
@@ -186,10 +217,8 @@ def do_m_update():
     elif invalid_seq(ent[1]):
       return goback % 'You cannot give a non-aminoacid sequence, dear.' + invalid_seq(ent[1])
     else:
-      record = SeqRecord(Seq(ent[1],
-                   IUPAC.protein),
-                   id="gnl|"+slots[int(slot)]+"|"+ent[0], name=ent[0], description=ent[2])
-      verbo = ambigous_seq(ent[1])
+      record = SeqRecord(Seq(ent[1], IUPAC.protein), id="gnl|"+slots[int(slot)]+"|"+ent[0], name=ent[0], description=ent[2])
+      verbo = ambigous_aminoacid(ent[1])
       myfasta.append(record)
   ### fasta given, needs to be in swissprot header format: xx|accession|name description
   elif met == 'file':
@@ -199,61 +228,59 @@ def do_m_update():
     if not isinstance(upload,list):
       print "was no list - wtf?!"
       upload = [upload]
-    records = list()
+    i = 0
+    seqset = set()
+    accset = set()
     for file in upload:
       name, ext = os.path.splitext(file.filename)
       print name
       if ext not in ('.fasta', '.fa'):
         return goback % 'File extension not allowed.'
-      records.extend(list(SeqIO.parse(file.file, "fasta")))
-    id_clash = False
-    myids = list()
-    for r in records:
-      if r.id.split('|',1)[-1] in baseids:
-        id_clash = True
-        break
-      if r.id.split('|',1)[-1] in myids:
-        id_clash = True
-        break
-      myids.append(r.id.split('|',1)[-1])
-    if id_clash:
-      for i,r in enumerate(records): #in case of id clash all get a gln|#nid| prefix!
-        r.id= 'gln|' + str(i) + 'nid|' + r.id 
-        r.description= 'gln|' + str(i) + 'nid|' + r.description 
-        r.name= 'gln|' + str(i) + 'nid|' + r.name 
-    else:
-      for r in records:
-        r.id= 'gln|' + r.id.split('|',1)[-1]
-        r.description= 'gln|' + r.description.split('|',1)[-1]
-        r.name= 'gln|' + r.name.split('|',1)[-1]
+      ps = SeqIO.parse(file.file, "fasta")  
+      for record in ps:
+          if acc_not_seen_before(record,accset) and seq_not_seen_before(record,seqset):
+            records['gln|' + str(i) + 'nid|' + record.id.split('|',1)[-1]] = str(record.seq)
+            i = i+1
     test = invalid_seq(records)
-    verbo = ambigous_seq(records)
+    verbo = ambigous_aminoacid(records)
     if test:
       return goback % 'You cannot give a non-aminoacid sequence. Meh. <br> ' + " " +test
-    myfasta.extend(records)
+    #~ myfasta.extend(records)
     #~ return goback % 'Not implemented yet, sorry.'
   else:
     return '<a href="javascript:history.back()">Whoopsie. (There might be a universal conspiracy going on against you.)</a>'
   try:
+    mascot_inco_dir = '/home/user/mascot/sequence/' + slots[int(slot)] + "/incoming/"
     mascot_seq_dir = '/home/user/mascot/sequence/' + slots[int(slot)] + "/current/"
     version = 0
     onlyfiles = [ f for f in listdir(mascot_seq_dir) if ( isfile(join(mascot_seq_dir,f)) and f.endswith('.fasta') and (not f.startswith('~')))]
-    if len(onlyfiles) == 1:
-      try:
-        version = int(onlyfiles[0].split('.')[0].split('_')[-1]) + 1
-      except:  
-        version  = 0
+    try:
+      version = max([int(x.split('.')[0].split('_')[-1]) for x in onlyfiles]) + 1
+    except:  
+      version  = 0
     nufile =  slots[int(slot)] + "_"+ str(datetime.datetime.now().strftime('%d%m%Y')) + "_" + str(version) + ".fasta"
-    with open(mascot_seq_dir+nufile, 'w') as open_file:
+    with open(mascot_inco_dir+nufile, 'w+') as open_file:
       #~ print '111 ---',mascot_seq_dir , slots[int(slot)]  , "_" , str(datetime.datetime.now().strftime('%d%m%Y'))  ,  "_"  , str(version) ,  ".fasta - length in sequences", len(myfasta) 
       SeqIO.write(myfasta, open_file, "fasta")
+      for rs in records:
+        r = SeqRecord(Seq(records[rs], IUPAC.protein), id=rs,description="")
+        r = SeqIO.write(r, open_file, "fasta")
+      os.rename(mascot_inco_dir+nufile,mascot_seq_dir+nufile)
   except:
     return '<a href="javascript:history.back()">Woah! (Cannot write into your slot.)</a>'
      
-  remark = ''
-  if id_clash:
-      remark = remark + 'Your fasta had conflicting ids, have been overwritten with generic ones.'
-  return nufile + '\n' + verbo + '\n' + remark
+  #~ remark = ''
+  #~ if id_clash:
+      #~ remark = remark + 'Your fastas had conflicting ids, have been overwritten with generic ones.'
+  head = ''
+  try:
+    with open(mascot_seq_dir+nufile) as myfile:
+      head=[myfile.next() for x in xrange(13*10)]
+  except: 
+    return '<a href="javascript:history.back()">Woah! (Cannot write into your slot.)</a>'
+  
+  remark = 'Your fastas had conflicting accessions, have been overwritten with generic ones.'
+  return 'look for ' + nufile + ' @ mascot_status <br>' + verbo + '<br>' + remark  + '<br>'  + '<br>' + 'first 13 lines of the fasta on the server:' + '<br>' + '<br>'.join(head)
     
 
 run(host='192.168.123.136', port=9999, reloader=True)
