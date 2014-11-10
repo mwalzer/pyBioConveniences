@@ -8,6 +8,7 @@ import os
 import datetime
 from os import listdir
 from os.path import isfile,isdir, join
+import cgi
 
 #has to be started as process of the same user that owns mascot/sequence directory, i.e. www-data
 #parse rule for the accession has to be ">[^|]*|[^|]*|\([^ ]*\)" i.e. no.34
@@ -143,7 +144,7 @@ def m_update():
         </tr><tr>
           <td>Or:</td>
           <td><input type="radio" name="inputmethod" value="file"> fasta file upload</td>
-          <td><input type="file" name="fileupload" /></td>
+          <td><input type="file" name="fileupload" multiple /></td>
         </tr><tr>
         </tr><tr>
           <td colspan="3" align="center"><input value="Go!" type="submit", name="mupdate" style="height:40px; width:600px"/></td>
@@ -162,7 +163,7 @@ def do_m_update():
     return goback % 'Select a slot first, dumdum. '
   basis = request.forms.get('basisselection')
   myfasta = list()
-  myids = list()
+  baseids = list()
   ### base fasta given, needs to be in swissprot header format: xx|accession|name description
   if basis!="0":  
     with open('/home/user/mascot/basisfasta/'+prebuilds[int(basis)], 'rb') as file:
@@ -171,7 +172,7 @@ def do_m_update():
         r.id= 'gln|' + r.id.split('|',1)[-1]
         r.description= 'gln|' + r.description.split('|',1)[-1]
         r.name= 'gln|' + r.name.split('|',1)[-1]
-        myids.append(r.id.split('|',1)[-1])
+        baseids.append(r.id.split('|',1)[-1])
   met = request.forms.get('inputmethod')
   if not met:
     return goback % 'Choose a input first, buddy.'
@@ -192,24 +193,34 @@ def do_m_update():
       myfasta.append(record)
   ### fasta given, needs to be in swissprot header format: xx|accession|name description
   elif met == 'file':
-    upload = request.files.get('fileupload')
-    print dir(upload)
+    upload = request.files.getall('fileupload') #getall for multiple files hack
     if not upload:
       return goback % 'Choose a file first, buddy.'
-    name, ext = os.path.splitext(upload.filename)
-    if ext not in ('.fasta', '.fa'):
-      return goback % 'File extension not allowed.'
-    records = list(SeqIO.parse(upload.file, "fasta"))
+    if not isinstance(upload,list):
+      print "was no list - wtf?!"
+      upload = [upload]
+    records = list()
+    for file in upload:
+      name, ext = os.path.splitext(file.filename)
+      print name
+      if ext not in ('.fasta', '.fa'):
+        return goback % 'File extension not allowed.'
+      records.extend(list(SeqIO.parse(file.file, "fasta")))
     id_clash = False
+    myids = list()
     for r in records:
+      if r.id.split('|',1)[-1] in baseids:
+        id_clash = True
+        break
       if r.id.split('|',1)[-1] in myids:
         id_clash = True
         break
+      myids.append(r.id.split('|',1)[-1])
     if id_clash:
-      for i,r in enumerate(records):
-        r.id= 'gln|' + str(i) + 'nid|' + r.id.split('|',2)[-1]
-        r.description= 'gln|' + str(i) + 'nid|' + r.description.split('|',2)[-1]
-        r.name= 'gln|' + str(i) + 'nid|' + r.name.split('|',2)[-1]
+      for i,r in enumerate(records): #in case of id clash all get a gln|#nid| prefix!
+        r.id= 'gln|' + str(i) + 'nid|' + r.id 
+        r.description= 'gln|' + str(i) + 'nid|' + r.description 
+        r.name= 'gln|' + str(i) + 'nid|' + r.name 
     else:
       for r in records:
         r.id= 'gln|' + r.id.split('|',1)[-1]
@@ -218,7 +229,7 @@ def do_m_update():
     test = invalid_seq(records)
     verbo = ambigous_seq(records)
     if test:
-      return goback % 'You cannot give a non-aminoacid sequence. Meh. \n' + test
+      return goback % 'You cannot give a non-aminoacid sequence. Meh. <br> ' + " " +test
     myfasta.extend(records)
     #~ return goback % 'Not implemented yet, sorry.'
   else:
