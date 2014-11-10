@@ -175,6 +175,7 @@ def m_update():
           <td>Or:</td>
           <td><input type="radio" name="inputmethod" value="file"> fasta file upload</td>
           <td><input type="file" name="fileupload" multiple /></td>
+          <td>No accession:<input type="checkbox" name="uniprotonly" value="uniprotonly"> I understand the risks (and there are!)</td>
         </tr><tr>
         </tr><tr>
           <td colspan="3" align="center"><input value="Go!" type="submit", name="mupdate" style="height:40px; width:600px"/></td>
@@ -222,6 +223,7 @@ def do_m_update():
       myfasta.append(record)
   ### fasta given, needs to be in swissprot header format: xx|accession|name description
   elif met == 'file':
+    uniprotonly = request.forms.get('uniprotonly') #getall for multiple files hack
     upload = request.files.getall('fileupload') #getall for multiple files hack
     if not upload:
       return goback % 'Choose a file first, buddy.'
@@ -237,12 +239,19 @@ def do_m_update():
       if ext not in ('.fasta', '.fa'):
         return goback % 'File extension not allowed.'
       ps = SeqIO.parse(file.file, "fasta")  
-      for record in ps:
-          if acc_not_seen_before(record,accset) and seq_not_seen_before(record,seqset):
-            records['gln|' + str(i) + 'nid|' + record.id.split('|',1)[-1]] = str(record.seq)
-            i = i+1
-    test = invalid_seq(records)
-    verbo = ambigous_aminoacid(records)
+      if uniprotonly != 'uniprotonly':
+        for record in ps:
+            if acc_not_seen_before(record,accset) and seq_not_seen_before(record,seqset):
+              records['gln|' + str(i) + 'nid|' + record.id.split('|',1)[-1]] = str(record.seq)
+              i = i+1
+      else:
+        for record in ps:
+          records[record.id+'|'+record.description] = str(record.seq)
+    if uniprotonly != 'uniprotonly':
+      test = invalid_seq(records)
+      verbo = ambigous_aminoacid(records)
+    else:
+      test = False
     if test:
       return goback % 'You cannot give a non-aminoacid sequence. Meh. <br> ' + " " +test
     #~ myfasta.extend(records)
