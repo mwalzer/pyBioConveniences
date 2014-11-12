@@ -263,6 +263,12 @@ def do_m_update():
     mascot_seq_dir = '/home/user/mascot/sequence/' + slots[int(slot)] + "/current/"
     version = 0
     onlyfiles = [ f for f in listdir(mascot_seq_dir) if ( isfile(join(mascot_seq_dir,f)) and f.endswith('.fasta') and (not f.startswith('~')))]
+    #clean first
+    mascot_old_dir = '/home/user/mascot/sequence/' + slots[int(slot)] + "/old/"
+    errfiles = [ f for f in listdir(mascot_seq_dir) if ( isfile(join(mascot_seq_dir,f)) and f.endswith('.errors') and (not f.startswith('~')))]
+    for errfile in errfiles:
+      os.rename(mascot_seq_dir+errfile,mascot_old_dir+errfile)
+      os.rename(mascot_seq_dir+errfile[:-6]+"fasta",mascot_old_dir+"defunct_"+errfile[:-6]+"fasta")
     try:
       version = max([int(x.split('.')[0].split('_')[-1]) for x in onlyfiles]) + 1
     except:  
