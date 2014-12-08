@@ -1,12 +1,14 @@
+#!/usr/bin/env python
+"""
+	Read method file name from raw file - not recursive
+"""
 __author__ = 'walzer'
-
-#! /usr/bin/python
 
 import sys
 import argparse
 import re
 from os import listdir
-from os.path import isfile, isdirectory, join
+from os.path import isfile, isdir, join
 import pickle
 
 def access_meth(rf):
@@ -22,31 +24,34 @@ def access_meth(rf):
 	return None
 
 
-def __main__():
-	parser = argparse.ArgumentParser(description='Read method file name from raw file - not recursive')
-	parser.add_argument('-in','--input', help='Raw file or directory with files to read raw from.', required=True)
+def main():
+	"""
+	manage input & output, call ascii access function
+	"""
+	parser = argparse.ArgumentParser(description=__doc__)
+	parser.add_argument('-i','--input', help='Raw file or directory with files to read raw from.', required=True)
 	parser.add_argument('-p','--pickle', help='Pickle for result dictionary, no console output.', required=False)
-	if len(sys.argv)==1:
+	print parser.description
+	if len(sys.argv)<=1:
 		parser.print_help()
 		sys.exit(1)
 	args = vars(parser.parse_args())
-	if not args['in']:
-		parser.print_help()
-		
-	if isfile(args['in']) and (args['in'].endswith('.RAW') or args['in'].endswith('.raw') ):
-		m = access_meth(args['in'])
-		if args['p']:
-			pickle.dump( {args['in']:m}, open( args['p'], "wb" ) )
+	if isfile(args['input']) and (args['input'].endswith('.RAW') or args['input'].endswith('.raw') ):
+		m = access_meth(args['input'])
+		if args['pickle']:
+			pickle.dump( {args['input']:m}, open( args['pickle'], "wb" ) )
 		else:
-			print args['in'], ":", m
-	else if isdirectory(args['in']):
-		onlyrawfiles = [ f for f in listdir(args['in']) if ( isfile(join(args['in'],f)) and (f.endswith('.RAW') or f.endswith('.raw') ) and (not f.startswith('~')))]
+			print args['input'], ":", m
+	elif isdir(args['input']):
+		onlyrawfiles = [ join(args['input'],f) for f in listdir(args['input']) if ( isfile(join(args['input'],f)) and (f.endswith('.RAW') or f.endswith('.raw') ) and (not f.startswith('~')))]
 		m = {f: access_meth(f) for f in onlyrawfiles}
-		if args['p']:
-			pickle.dump( m, open( args['p'], "wb" ) )
+		if args['pickle']:
+			pickle.dump( m, open( args['pickle'], "wb" ) )
 		else:
 			for p in m:
 				print p, ":", m[p]
 	else:
 		parser.print_help()
 
+if __name__ == "__main__":
+    main()
