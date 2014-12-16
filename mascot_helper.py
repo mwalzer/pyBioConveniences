@@ -289,13 +289,14 @@ def do_m_update():
       #~ remark = remark + 'Your fastas had conflicting ids, have been overwritten with generic ones.'
   head = ''
   try:
-    with open(mascot_seq_dir+nufile) as myfile:
-      head=[myfile.next() for x in xrange(13*10)]
-  except: 
-    return '<a href="javascript:history.back()">Woah! (Cannot write into your slot.)</a>'
+    with open(mascot_seq_dir+nufile, 'r') as myfile:
+      N = 13*10
+      head = list(islice(myfile, N))
+  except Exception as e: 
+    return '<a href="javascript:history.back()">Crap! (Cannot read from your slot.)</a>' + '<br> (' +  str(e)  + ')'
   
   remark = 'Your fastas had conflicting accessions, have been overwritten with generic ones.'
-  return 'look for ' + nufile + ' @ mascot_status <br>' + verbo + '<br>' + remark  + '<br>'  + '<br>' + 'first 13 lines of the fasta on the server:' + '<br>' + '<br>'.join(head)
-    
+  return 'look for ' + nufile + ' @ mascot_status <br>' + verbo + '<br>' + remark  + '<br>'  + '<br>' + 'first N lines of the fasta on the server:' + '<br>' + '<br>'.join(head)
+
 
 run(host='192.168.123.136', port=9999, reloader=True)
