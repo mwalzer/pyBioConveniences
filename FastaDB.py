@@ -32,7 +32,7 @@ class FastaDB:
         self.accs = list()  # all accessions in respective order to searchstring
         self.idx = list()  # all indices of starting strings in the searchstring in respective order
 
-    def readSeqs(self, sequence_file):
+    def read_seqs(self, sequence_file):
         """
         read sequences from uniprot files (.dat or .fasta) or from lists or dicts of BioPython SeqRecords
         and make them available for fast search. Appending also with this function.
@@ -62,7 +62,7 @@ class FastaDB:
                 self.idx.append(1 + self.idx[-1] + len(self.collection.values()[i].seq))
         return
 
-    def writeSeqs(self, name):
+    def write_seqs(self, name):
         """
         writes all fasta entries in the current object into one fasta file
         :param name: the complete path with file name where the fasta is going to be written

@@ -17,7 +17,7 @@ class TestFastaDB(TestCase):
             #  all warnings to be triggered.
             warnings.simplefilter("always")
             #  trigger warning.
-            fdb.readSeqs('')
+            fdb.read_seqs('')
             # tests
             self.assertFalse(len(w) < 1, 'More warnings then expected')
             self.assertTrue(issubclass(w[-1].category, UserWarning))
@@ -26,7 +26,7 @@ class TestFastaDB(TestCase):
 
         # case three.fasta
             fdb = FastaDB.FastaDB()
-            fdb.readSeqs('three.fasta')
+            fdb.read_seqs('three.fasta')
             self.assertTrue(len(fdb.collection) == 3)
             self.assertTrue(len(fdb.idx) == 3+1)
             self.assertTrue(len(fdb.accs) == 3)
@@ -37,7 +37,7 @@ class TestFastaDB(TestCase):
             self.assertTrue(len(fdb.searchstring) == ts)
 
         #case addition of three.dat
-            fdb.readSeqs('three.dat')
+            fdb.read_seqs('three.dat')
             self.assertTrue(len(fdb.collection) == 6)
             self.assertTrue(len(fdb.idx) == 6+1)
             self.assertTrue(len(fdb.accs) == 6)
@@ -49,16 +49,16 @@ class TestFastaDB(TestCase):
 
     def test_writeSeqs(self):
         fdb = FastaDB.FastaDB()
-        fdb.readSeqs('three.fasta')
+        fdb.read_seqs('three.fasta')
         with tempfile.NamedTemporaryFile() as temp:
-            fdb.writeSeqs(temp.name)
+            fdb.write_seqs(temp.name)
             # self.assertTrue(hashlib.sha256(open(temp.name, 'rb').read()).digest() == hashlib.sha256(open("three.fasta", 'rb').read()).digest())
             filecmp.cmp(temp.name, 'three.fasta')
 
 
     def test_exists(self):
         fdb = FastaDB.FastaDB()
-        fdb.readSeqs('three.fasta')
+        fdb.read_seqs('three.fasta')
         exi = "TERNEKKQQMGKEYREKIEAEL"
         ine = "XXXNEKKQQMGKEYREKIEAEL"
         self.assertTrue(fdb.exists(exi))
@@ -66,12 +66,12 @@ class TestFastaDB(TestCase):
 
     def test_search(self):
         fdb = FastaDB.FastaDB()
-        fdb.readSeqs('three.fasta')
+        fdb.read_seqs('three.fasta')
         eal = "ELD"
         self.assertDictEqual(fdb.search(eal), {'ELD': 'sp|P31946|1433B_HUMAN'})
 
     def test_search_all(self):
         fdb = FastaDB.FastaDB()
-        fdb.readSeqs('three.fasta')
+        fdb.read_seqs('three.fasta')
         eal = "ELD"
         self.assertDictEqual(fdb.search_all(eal), {'ELD': 'sp|P31946|1433B_HUMAN,sp|Q04917|1433F_HUMAN,sp|P62258|1433E_HUMAN'})
