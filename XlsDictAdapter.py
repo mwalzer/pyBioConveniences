@@ -53,7 +53,7 @@ def xlsDictWriter(f, list_of_dicts, sheet_name='sheet'):
         tmp = xlrd.open_workbook(f)
         book = copy(tmp)
     except:
-        book = xlwt.Workbook(encoding='ascii')
+        book = xlwt.Workbook(encoding='utf8')
     sheet = book.add_sheet(sheet_name)
     if len(list_of_dicts) > 0:
         header = set()
@@ -65,7 +65,10 @@ def xlsDictWriter(f, list_of_dicts, sheet_name='sheet'):
         for i, r in enumerate(list_of_dicts):
             for j, key in enumerate(header):
                 try:
-                    sheet.write(i + 1, j, label=str(r[key]))
+                    if type(r[key]) == int or type(r[key]) == float:
+                        sheet.write(i + 1, j, label=r[key])
+                    else:	
+                    	sheet.write(i + 1, j, label=str(r[key]))
                 except:
                     sheet.write(i + 1, j, label="#N/A")
         book.save(f)
