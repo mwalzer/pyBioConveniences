@@ -39,46 +39,56 @@ def xlsDictReader(f, sheet_index=0, sheet_name='', no_header=False):
     ret = list()
     for i in range(k, sheet.nrows):
         ret.append(dict((headers[j], sheet.cell_value(i, j)) for j in headers))
-    return ret
+    return ret,headers
 
 
-def xlsDictWriter(f, list_of_dicts, sheet_name='sheet'):
+def xlsDictWriter(f, list_of_dicts, origin_header=None, sheet_name='sheet'):
     """"
     writes a sheet into a xls file
     :param f: string for the filename sheet_name is the name of the sheet to be written, can't be overwritten.
     :param list_of_dicts: the list of dicts to be written in a xls sheet - limited to 65536 rows due to xlwt
     :param sheet_name: string for the sheet's name to be written
+    :param origin_header: dict of strings representing a (sub)set of the keys in each list_of_dicts. The desired order is designated by the order of the (numerical) keys of this dict.
     """
+
+    #TODO: handle unicode strings - from django.utils.encoding import smart_str, smart_unicode? see sheet.write
     try:
         tmp = xlrd.open_workbook(f)
         book = copy(tmp)
     except:
-        book = xlwt.Workbook(encoding='utf8')
+        book = xlwt.Workbook(encoding="UTF-8")
     sheet = book.add_sheet(sheet_name)
     if len(list_of_dicts) > 0:
-        header = set()
+        dict_header = set()
         for row in list_of_dicts:
             for r in row.keys():
-                header.add(r)
+                dict_header.add(r)
+        if origin_header:
+            header = list()
+            order = origin_header.keys()
+            order.sort()
+            print order
+            for i in order:
+                if origin_header[i] in dict_header:
+                    header.append(origin_header[i])
+            rest = dict_header - set(origin_header.values())
+            for i in rest:
+                header.append(i)
+        else:
+            header = dict_header
+        print header
         for i, key in enumerate(header):
-            sheet.write(0, i, label=str(key))
+            sheet.write(0, i, label=key)
         for i, r in enumerate(list_of_dicts):
             for j, key in enumerate(header):
                 try:
                     if type(r[key]) == int or type(r[key]) == float:
                         sheet.write(i + 1, j, label=r[key])
-                    else:	
-                    	sheet.write(i + 1, j, label=str(r[key]))
+                    else:
+                        sheet.write(i + 1, j, label=str(r[key]))
                 except:
                     sheet.write(i + 1, j, label="#N/A")
         book.save(f)
         return True
-    #~ if len(ld) > 0:
-    #~ ks = ld[0].keys()
-    #~ for i,key in enumerate(ks):
-    #~ sheet.write(0, i, label = str(key))
-    #~ for i,r in enumerate(ld):
-    #~ for j,key in enumerate(ks):
-    #~ sheet.write(i+1, j, label = str(r[key]))
     else:
         return False
