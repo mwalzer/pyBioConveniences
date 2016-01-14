@@ -23,7 +23,7 @@ import argparse
 
 
 __author__ = 'walzer'
-VERSION = "0.1"
+VERSION = "0.2"
 
 
 def random_peptide_sequence(length=9):
@@ -93,6 +93,7 @@ def __main__():
     mns.pepseqs_chunks = list()
     #http://stackoverflow.com/questions/22487296/multiprocessing-in-python-sharing-large-object-e-g-pandas-dataframe-between
     #http://stackoverflow.com/questions/5549190/is-shared-readonly-data-copied-to-different-processes-for-python-multiprocessing/5550156#5550156
+    #http://chase-seibert.github.io/blog/2013/08/03/diagnosing-memory-leaks-python.html
 
     peps = list()
     #fastaname = "/share/usr/walzer/immuno-tools/dbs/swissprotHUMANwoi_130927.fasta"
@@ -122,8 +123,9 @@ def __main__():
     # for x in results[1:]:
     #     result.merge_results(x)
 
-    result = pd.concat(results)
-    result.to_csv(options.out)
+    #result = pd.concat(results)
+    for i, result in enumerate(results):
+        result.to_csv(options.out + str(i))
 
     tx = (time.time() - start_time)
     print("--- %s seconds ~ %s chunks---" % (tx, len(mns.pepseqs_chunks)))
