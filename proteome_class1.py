@@ -23,7 +23,7 @@ import argparse
 
 
 __author__ = 'walzer'
-VERSION = "0.0"
+VERSION = "0.1"
 
 
 def random_peptide_sequence(length=9):
@@ -33,10 +33,11 @@ def random_peptide_sequence(length=9):
 def slice_mers(biopy_seqrec, windowsize=9, exclude_ambiguous=True):
     res = defaultdict(dict)
     agg = defaultdict(int)
-    for item in biopy_seqrec:
+    for numb, item in enumerate(biopy_seqrec):
         s = defaultdict(int)
         try:
             seq = str(item.seq)
+            print numb
             for i, v in enumerate(seq):
                 if len(seq)-i < windowsize:
                     break
@@ -55,7 +56,8 @@ def slice_mers(biopy_seqrec, windowsize=9, exclude_ambiguous=True):
             res[item.name][str(ntup)+'tupel'] = nval
     for ntup, nval in enumerate(np.bincount(agg.values())):
         res["agglomerated"][str(ntup)+'tupel'] = nval
-        gc.collect()
+
+    gc.collect()
     return res, agg.keys()
 
     #k = slice_mers(records, 9, True, True)
@@ -64,7 +66,8 @@ def slice_mers(biopy_seqrec, windowsize=9, exclude_ambiguous=True):
 
 def toplevel_predictor(x):
     predictor = EpitopePredictorFactory("netMHC", version="3.4")
-    return predictor.predict(x)
+    peps = [Peptide(i) for i in x]
+    return predictor.predict(peps)
 
 
 def __main__():
@@ -85,29 +88,33 @@ def __main__():
         parser.print_help()
         sys.exit(1)
 
-    #http://stackoverflow.com/questions/5549190/is-shared-readonly-data-copied-to-different-processes-for-python-multiprocessing/5550156#5550156
-    peps = list()
+    mgr = multiprocessing.Manager()
+    mns = mgr.Namespace()
+    mns.pepseqs_chunks = list()
     #http://stackoverflow.com/questions/22487296/multiprocessing-in-python-sharing-large-object-e-g-pandas-dataframe-between
+    #http://stackoverflow.com/questions/5549190/is-shared-readonly-data-copied-to-different-processes-for-python-multiprocessing/5550156#5550156
 
+    peps = list()
     #fastaname = "/share/usr/walzer/immuno-tools/dbs/swissprotHUMANwoi_130927.fasta"
     if options.fasta:
         with open(options.fasta, "rU") as handle:
             records = [record for record in SeqIO.parse(handle, "fasta")]
-            #agl, peps = slice_mers(records, 9, True)
-            peps = [Peptide(x) for x in slice_mers(records, 9, True)[1]]
+            peps = slice_mers(records, 9, True)[1]#agl, peps = slice_mers(records, 9, True)
+            del records
 
     if options.window:
         for i in range(0, options.window):
-            peps.append(Peptide(random_peptide_sequence(length=options.length)))
+            peps.append(random_peptide_sequence(length=options.length))
 
+    mns.pepseqs_chunks = [peps[x:x + options.chunksize] for x in xrange(0, len(peps), options.chunksize)]
+    del peps
     gc.collect()
 
     import time
     start_time = time.time()
 
     pool = multiprocessing.Pool(processes=options.threads)
-    chunks = [peps[x:x + options.chunksize] for x in xrange(0, len(peps), options.chunksize)]
-    results = pool.map(toplevel_predictor, chunks)
+    results = pool.map(toplevel_predictor, mns.pepseqs_chunks)
     #results = [pool.apply(toplevel_predictor, args=(x,)) for x in chunks]
 
     #merge the dataframes does not work like supposed to! with same method DFs
@@ -119,7 +126,7 @@ def __main__():
     result.to_csv(options.out)
 
     tx = (time.time() - start_time)
-    print("--- %s seconds ~ %s chunks---" % (tx, len(chunks)))
+    print("--- %s seconds ~ %s chunks---" % (tx, len(mns.pepseqs_chunks)))
 
 
 if __name__ == '__main__':
