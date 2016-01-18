@@ -33,6 +33,7 @@ def random_peptide_sequence(length=9):
 def slice_mers(biopy_seqrec, windowsize=9, exclude_ambiguous=True):
     res = defaultdict(dict)
     agg = defaultdict(int)
+    ex = 0
     for numb, item in enumerate(biopy_seqrec):
         s = defaultdict(int)
         try:
@@ -47,8 +48,10 @@ def slice_mers(biopy_seqrec, windowsize=9, exclude_ambiguous=True):
                         s[tmp] += 1
                         agg[tmp] += 1
                     else:
-                        s[tmp] += 1
-                        agg[tmp] += 1
+                       ex += 1
+                else:
+                    s[tmp] += 1
+                    agg[tmp] += 1
         except:
             print 'error with item', item.name
         res[item.name]['len'] = len(item)
@@ -58,6 +61,8 @@ def slice_mers(biopy_seqrec, windowsize=9, exclude_ambiguous=True):
         res["agglomerated"][str(ntup)+'tupel'] = nval
 
     gc.collect()
+    if ex:
+        print "excluded", str(ex), "protein slices"
     return res, agg.keys()
 
     #k = slice_mers(records, 9, True, True)
@@ -110,6 +115,9 @@ def __main__():
     mns.pepseqs_chunks = [peps[x:x + options.chunksize] for x in xrange(0, len(peps), options.chunksize)]
     del peps
     gc.collect()
+
+    print "start predictions of", str(len(mns.pepseqs_chunks)), "chunks", str(len(mns.pepseqs_chunks[0])), "each"
+    print "from ...", mns.pepseqs_chunks[0][0], "... to", mns.pepseqs_chunks[-1][-1]
 
     import time
     start_time = time.time()
