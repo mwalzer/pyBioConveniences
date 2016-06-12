@@ -5,6 +5,9 @@ __pycache__/
 # C extensions
 *.so
 
+#python pickles - as I call them
+*.pkl
+
 # Distribution / packaging
 .Python
 env/
@@ -52,3 +55,5 @@ coverage.xml
 # Sphinx documentation
 docs/_build/
 
+# ide stuff
+.idea/*
