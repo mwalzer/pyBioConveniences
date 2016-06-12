@@ -5,8 +5,6 @@ import os
 from datetime import datetime
 import logging
 import argparse
-from os.path import isfile, isdir, join, basename
-from os import listdir
 import pickle
 import pyopenms as oms
 from os.path import join
@@ -15,10 +13,6 @@ from Fred2.Core.Peptide import Peptide
 from Fred2.EpitopePrediction import EpitopePredictorFactory
 
 VERSION = "0.2"
-
-#~ path = "/share/projects/ligandomics/BD/MZID/id_sp_xd+PI/"
-#~ idf = "150523_DYTK_BD-ZH03_Skin_W_C18postSCX_20%_Rep#1_50cm195min3s_msms1.idXML"
-# fin = "/share/projects/ligandomics/BD/MZID/id_sp_xd+PI/150523_DYTK_BD-ZH03_Skin_W_C18postSCX_20%_Rep#1_50cm195min3s_msms1.idXML"
 
 def categorize(score):
     if score >= 0.6384377847127609:
@@ -30,8 +24,8 @@ def categorize(score):
 
 def __main__():
     parser = argparse.ArgumentParser(version=VERSION)
-    parser.add_argument('-in',  dest="inf", help='<Required> full path to the input idXML directory', required=True)
-    parser.add_argument('-out', dest="out", help="<Required> full path to the output idXML directory", required=True)
+    parser.add_argument('-in',  dest="inf", help='<Required> full path to the input idXML', required=True)
+    parser.add_argument('-out', dest="out", help="<Required> full path to the output idXML", required=True)
 
     options = parser.parse_args()
     if len(sys.argv) <= 1:
@@ -41,29 +35,22 @@ def __main__():
     if not (options.inf or options.out):
         parser.print_help()
         sys.exit(1)
+    #~ else:
+    #~ print dir(options)
 
-    if not (isdir(options.inf) or isdir(options.out)):
-        parser.print_help()
+    #~ if options.temp_path:
+        #~ temp_dir = options.temp_path
+    #~ else:
+        #~ temp_dir = "/tmp/"
+
+    if "Tue39L243" in options.inf:
+        print "class2 run recognized", options.inf
         sys.exit(1)
 
-    idfs = [join(options.inf, f) for f in listdir(options.inf) if isfile(join(options.inf, f)) and f.endswith('.idXML') and "Tue39L243" not in f]
-
-    pepstr = set()
-    
-    for inf in idfs:
-        pros = list()
-        peps = list()
-        f = oms.IdXMLFile()
-        #~ f.load(join(path, idf), pros, peps)
-        f.load(inf, pros, peps)
-        for pep in peps:
-            for h in pep.getHits():
-                if "decoy" not in h.getMetaValue("target_decoy"):
-                    if 7 < len(h.getSequence().toUnmodifiedString()) < 12:
-                        pepstr.add(h.getSequence().toUnmodifiedString())
-
     donordir = {"BD-ZH03": ['A*01:01','A*11:01','B*15:01','B*35:01','C*03:03','C*04:01'], 
-    "BD-ZH02": ['A*11:01','A*68:01','B*15:01','B*35:03','C*03:03','C*04:01']}
+    "BD-ZH02": ['A*11:01','A*68:01','B*15:01','B*35:03','C*03:03','C*04:01'],
+    "BD-ZH01": ['A*02:01','A*11:01','B*27:05','B*51:01','C*01:02','C*15:02'], 
+    "BD-ZH06": ['A*03:01','A*68:02','B*07:02','B*14:02','C*07:02','C*08:02']}
 
     ttn = EpitopePredictorFactory('netmhc')
     target_alleles_net = None
@@ -75,6 +62,21 @@ def __main__():
         print "no donor recognized", options.inf
         sys.exit(1)
 
+    pros = list()
+    peps = list()
+    f = oms.IdXMLFile()
+    #~ f.load(join(path, idf), pros, peps)
+    f.load(options.inf, pros, peps)
+
+    pepstr = set()
+    for pep in peps:
+        for h in pep.getHits():
+            if "decoy" not in h.getMetaValue("target_decoy"):
+                ps = h.getSequence().toUnmodifiedString()
+                if 7 < len(ps) < 12:
+                    if "U" not in ps:
+                        pepstr.add(h.getSequence().toUnmodifiedString())
+
     hla_pref = 'HLA-'
     target_alleles_net_a = [Allele(hla_pref + x) for x in target_alleles_net]
 
@@ -83,8 +85,8 @@ def __main__():
     try:
         preds_n = ttn.predict(es, alleles=target_alleles_net_a)
     except Exception as e:
-        print "something went wrong with the netMHC prediction", options.inf, "what:",  e.
-        pickle.dump(pepstr, join(options.outf, "seqset.pkl"))
+        print "something went wrong with the netMHC prediction", options.inf, "what:",  str(e)
+        pickle.dump(pepstr, open( '.'.join(options.out.split(".")[:-1]) + ".pkl", "wb" ) )
         sys.exit(1)
 
     preds = dict()    
@@ -96,24 +98,22 @@ def __main__():
         if categ:
             preds[seq] = (allele,categ,score)
 
-    for inf in idfs:
-        pros = list()
-        peps = list()
-        f = oms.IdXMLFile()
-        f.load(inf, pros, peps)
-        for pep in peps:
-            hits = pep.getHits()
-            nhits = list()
-            for h in hits:
-                if h.getSequence().toUnmodifiedString() in preds:
-                    x = preds[h.getSequence().toUnmodifiedString()]
-                    h.setMetaValue('binder',x[0])
-                    h.setMetaValue(str(x[1]),x[2])
-                    nhits.append(h)
-                else:
-                    nhits.append(h)
-            pep.setHits(nhits)                    
-        f.store(options.out, pros, peps)
+    npeps = list()
+    for pep in peps:
+        hits = pep.getHits()
+        nhits = list()
+        for h in hits:
+            if h.getSequence().toUnmodifiedString() in preds:
+                x = preds[h.getSequence().toUnmodifiedString()]
+                h.setMetaValue('binder',x[0])
+                h.setMetaValue(str(x[1]),x[2])
+                nhits.append(h)
+            else:
+                nhits.append(h)
+        pep.setHits(nhits)                    
+
+    #~ f.store(join(path, odf), pros, peps)
+    f.store(options.out, pros, peps)
 
 
 if __name__ == '__main__':
